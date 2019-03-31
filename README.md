@@ -16,4 +16,4 @@ OpenFlow utilities and applications for the OpenDayLight controller
     ```bash
         $ python3 Apps/TopologyVisualizer.py
     ```
-    [![Пример](../ex.png)]
+    [![Пример](https://github.com/ZhekehZ/OFUtils/blob/master/ex.png)]
