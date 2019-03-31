@@ -1,4 +1,7 @@
-from flowMaker import *
+import sys
+sys.path.append(sys.path[0]+'/../Utils')
+
+from FlowMaker import *
 from Topology import ControllerSettings
 
 cs = ControllerSettings('localhost', 'admin', 'admin')
