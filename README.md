@@ -14,6 +14,6 @@ OpenFlow utilities and applications for the OpenDayLight controller
    Do not forget to call the ``pingall`` in minnet
  - Run the application, for example
     ```bash
-        $ python3 Apps/TopologyVisualizer.py
+        $ python3 visualizer.py
     ```
     [![Пример](../ex.png)]
