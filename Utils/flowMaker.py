@@ -42,14 +42,16 @@ def pushFlow(cs, topo, src, dst, flow=None, suffix="-flow(FM)"):
     
     fail = 0 # stats
     for (node, port) in path:
+        flowId = str(node.nId) + "-( " + src + " -> " + dst + ") " + suffix
         action = SimpleFlow.createActionOutputToPort(port)
         flow.resetActions().addAction(action).withSwitch(node.nId)
-        flow.withId(str(node.nId) + suffix)
+        flow.withId(flowId)
         if not flow.push(cs):
             fail += 1
-    print("FM> ADDING " + str(len(path)) + " NEW FLOWS:")
-    print("\tsuccess:  " + str(len(path) - fail))
-    print("\tfailure:  " + str(fail))           
+    #print("FM> ADDING " + str(len(path)) + " NEW FLOWS:")
+    #print("\tsuccess:  " + str(len(path) - fail))
+    #print("\tfailure:  " + str(fail))         
+    return (len(path) - fail, fail)  
         
         
         
