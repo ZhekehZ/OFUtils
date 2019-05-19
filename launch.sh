@@ -13,7 +13,8 @@ tmux send-keys "cd $OpenDaylight/bin/" C-m
 tmux send-keys "./karaf" C-m
 
 tmux select-pane -t 1
-tmux send-keys "sudo mn --controller=remote --topo=tree,3 --mac" C-m
+#tmux send-keys "sudo mn --controller=remote --topo=linear,3 --mac" C-m
+tmux send-keys "sudo mn --controller remote --topo=linear,3 --mac --custom vlanhost.py --host vlan,vlan=1000" C-m  
 
 
 tmux select-pane -t 2

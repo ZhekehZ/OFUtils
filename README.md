@@ -14,6 +14,7 @@ OpenFlow utilities and applications for the OpenDayLight controller
    Do not forget to call the ``pingall`` in minnet
  - Run the application, for example
     ```bash
-        $ python3 visualizer.py
+        $ chmod +x GUI.py
+        $ ./GUI.py
     ```
     ![Пример](https://github.com/ZhekehZ/OFUtils/blob/master/ex.png)
