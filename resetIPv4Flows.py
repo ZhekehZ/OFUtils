@@ -1,6 +1,4 @@
-import sys
-sys.path.append(sys.path[0]+'/Utils')
-from Utils.imports import *
+from Utils import *
 
 def resetIPv4Flows(cs, topo):
     FM = flowManager()

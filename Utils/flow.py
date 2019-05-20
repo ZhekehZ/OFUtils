@@ -1,4 +1,4 @@
-from controller import *
+from . controller import *
 
 class SimpleFlow:
     def __init__(self):

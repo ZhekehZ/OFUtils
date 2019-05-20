@@ -1,4 +1,4 @@
-from controller import *
+from . controller import *
 from json2xml import json2xml
 
 class flowManager:

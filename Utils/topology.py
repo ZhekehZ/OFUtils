@@ -1,4 +1,4 @@
-from controller import *
+from . controller import *
 import re
 
 class Node:

@@ -1,6 +1,4 @@
-import sys
-sys.path.append(sys.path[0]+'/Utils')
-from Utils.imports import *
+from Utils import *
 
 def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
     host = None
@@ -25,13 +23,13 @@ def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanTo))
-            print(sflow.push(cs))
+            #print(sflow.push(cs))
     for flow in FM.getSwitchTableFlowList(switch.nId, 0):
         if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'dst', mac):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanFrom))
-            print(sflow.push(cs))
+            #print(sflow.push(cs))
 
 if __name__ == '__main__':
     cs = Controller('localhost', 'admin', 'admin')

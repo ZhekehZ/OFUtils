@@ -1,5 +1,5 @@
-from flow import *
-from topology import *
+from . flow import *
+from . topology import *
 
 def __dfs(topo, node, dst, used, path):
     used.add(node.nId)

@@ -13,11 +13,8 @@ from tkinter import ttk
 import networkx as nx
 import numpy as np
 
-from changeVLAN import *
-
-import sys
-sys.path.append(sys.path[0]+'/Utils')
-from Utils.imports import *
+from changeVLAN import changeVLAN
+from Utils import *
 
 
 class App:
@@ -78,7 +75,6 @@ window.geometry('1200x600')
 cs = Controller('localhost', 'admin', 'admin')
 vis = App()   
 vis.requestData(cs) 
-
 tab_control = ttk.Notebook(window)  
 """
     TAB 1
@@ -97,14 +93,11 @@ lblt = Label(tab1,  width=50, height=15, text="", justify=LEFT, font=FONT)
 lblt.pack(side=TOP, fill=X, expand=True)
 lblt2 = Label(tab1,  width=50, height=20, text="-"*250)
 lblt2.pack(side=TOP, fill=X, expand=True)
-
-
 """
     TAB 2
 """
 tab2 = ttk.Frame(tab_control)  
 tab_control.add(tab2, text='Информация')  
-
 lbl2 = Label(tab2, text='Информация какая-то')
 lbl2.pack(pady=10,padx=10)
 
@@ -159,6 +152,7 @@ def changeVlan(ip):
         changeVLAN(cs, vis.topo, ip, vf, vt)
         a.destroy()
     a = Toplevel()
+    a.title("chVLAN %s"%ip)
     x, y = window.winfo_x(), window.winfo_y()
     w, h = window.winfo_width(), window.winfo_height()   
     a.geometry("%dx%d+%d+%d" % (230, 70, x + w // 2, y + h // 2))
