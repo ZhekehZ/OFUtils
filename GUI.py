@@ -3,11 +3,17 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure, Text
+from matplotlib.pyplot import Circle
+
+import warnings
+warnings.filterwarnings("ignore")
 
 from tkinter import *
 from tkinter import ttk
 import networkx as nx
 import numpy as np
+
+from changeVLAN import *
 
 import sys
 sys.path.append(sys.path[0]+'/Utils')
@@ -19,7 +25,7 @@ class App:
         self.__used = set()
         self.G = nx.Graph()  
         self.topo = Topology()
-        self.selected = []
+        self.selected = None
         
     def __fillGraph(self, node, port):
         self.__used.add(node.nId)
@@ -36,29 +42,28 @@ class App:
         self.switches = [s.nId for s in self.topo.nodes.values() if type(s) == Node]
         self.__fillGraph(self.topo.nodes[self.switches[0]], '')
         self.fig = Figure()
+        self.fig.tight_layout()
         #self.ax = self.fig.add_subplot(111)
         self.ax = self.fig.add_axes([0, 0, 1, 1])
+        self.ax.axis('equal')
         #self.ax.set_title('Network graph')
-        self.fig.tight_layout()
+        
         self.ax.set_axis_off()
         self.pos = nx.spectral_layout(self.G, scale=0.1)
         self.cs = cs
         
     def draw(self):
-        colors = []
-        
-        def isSel(n, m):
-            if len(self.selected) < m:
-                return False
-            else:
-                return self.selected[m-1] == n
-                
-        for n in self.G:
-            colors.append('b' if n in self.switches else 'g' if isSel(n, 1) else 'y' if isSel(n, 2) else 'r')
+        self.ax.cla()
+        self.ax.set_axis_off()
+        colors = ['b' if n in self.switches else 'r' for n in self.G]
         nx.draw_networkx_nodes(self.G, self.pos, node_color=colors, node_size=500, alpha=0.5, ax=self.ax)
         nx.draw_networkx_edges(self.G, self.pos, width=1, alpha=0.5, edge_color='k', ax=self.ax)
         nx.draw_networkx_labels(self.G, self.pos, font_size=11, ax=self.ax)
-
+        if self.selected:    
+            x, y = self.pos[self.selected]
+            stype = self.selected in self.switches
+            circle = Circle((x, y), 0.01, lw=2, fill=False, ec="red" if stype else 'blue', linestyle='--')
+            self.ax.add_artist(circle)
  
  
 
@@ -73,7 +78,6 @@ window.geometry('1200x600')
 cs = Controller('localhost', 'admin', 'admin')
 vis = App()   
 vis.requestData(cs) 
-vis.draw()
 
 tab_control = ttk.Notebook(window)  
 """
@@ -104,6 +108,13 @@ tab_control.add(tab2, text='Информация')
 lbl2 = Label(tab2, text='Информация какая-то')
 lbl2.pack(pady=10,padx=10)
 
+tab_control.pack(expand=1, fill='both') 
+
+def update():
+    vis.draw()
+    canvas.draw()
+
+update()
 
 def infoToStr(info):
     res = ""
@@ -114,8 +125,7 @@ def infoToStr(info):
             res += "port " + str(i[0]) + ":\n➜  " + str(i[1]) + "\n"
     return res
        
-        
-def b1(event):
+def checkMouse(ex, ey):
     dist = 100
     xl = vis.ax.get_xlim()
     yl = vis.ax.get_ylim()
@@ -124,10 +134,10 @@ def b1(event):
     width *= vis.fig.dpi
     height *= vis.fig.dpi
     
-    if event.x > width:
+    if ex > width:
         return
     
-    content = ""
+    nearest_node = None
     for n in vis.pos.keys():
         x,y = vis.pos[n]
         x = (x - xl[0]) / (xl[1] - xl[0])
@@ -135,23 +145,72 @@ def b1(event):
         x = width*x
         y = height*(1-y)
         
-        d = np.sqrt(abs(event.x - x) ** 2 + abs(event.y - y) ** 2)
+        d = np.sqrt(abs(ex - x) ** 2 + abs(ey - y) ** 2)
         if d < dist:
             dist = d
-            content = str(n).upper() + "\n\n"+ infoToStr(vis.G.nodes[n]['connections'])
-    lblt['text'] = content        
+            nearest_node = n
+            #content = str(n).upper() + "\n\n"+ infoToStr(vis.G.nodes[n]['connections'])
+   
+    return nearest_node
+
+def changeVlan(ip):
+    def change(vf, vt, win):
+        #print(vf, vt, ip)
+        changeVLAN(cs, vis.topo, ip, vf, vt)
+        a.destroy()
+    a = Toplevel()
+    x, y = window.winfo_x(), window.winfo_y()
+    w, h = window.winfo_width(), window.winfo_height()   
+    a.geometry("%dx%d+%d+%d" % (230, 70, x + w // 2, y + h // 2))
+    #a.geometry('240x90')
+    a.resizable(False, False)  
+    lold = Label(a, text="OLD VLAN", justify=LEFT)
+    lold.grid(row=0)
+    eold = Entry(a, width=20)
+    eold.grid(row=0, column=1)
+    lnew = Label(a, text="NEW VLAN", justify=LEFT)
+    lnew.grid(row=1)
+    enew = Entry(a, width=20)
+    enew.grid(row=1, column=1)
+    Button(a, text="submit", width=20, command=lambda:change(eold.get(), enew.get(), a)).grid(row=2, column=0, columnspan=2)
+
+class Popup:
+    def __init__(self):
+        self.menu = Menu(window.master)
+        self.ip = None
+        self.menu.add_command(label="Изменить VLAN", command=lambda:changeVlan(self.ip))
+        #self.menu.add_separator()
+
+    def show_menu_(self, event, nip):
+        self.ip = nip
+        self.menu.tk_popup(event.x_root, event.y_root)
+pop = Popup()          
+        
+def b1(event):
+    nn = checkMouse(event.x, event.y)
+    vis.selected = nn
+    content = str(nn).upper() + "\n\n"+ infoToStr(vis.G.nodes[nn]['connections']) if not nn is None else ''
+    lblt['text'] = content   
+    update()    
             
-#def b3(event):
-#    window.title("Правая кнопка мыши")
-#def move(event):
-#    x = event.x
-#    y = event.y
-#    s = "Движение мышью {}x{}".format(x, y)
-#    window.title(s)
+def b3(event):
+    nn = checkMouse(event.x, event.y)
+    vis.selected = nn
+    if nn in vis.hosts:
+        pop.show_menu_(event, vis.topo.nodes[nn].nAddresses[0][1])
+    update()
+
+def move(event):
+    update()
+    x = event.x
+    y = event.y
+    s = "Движение мышью {}x{}".format(x, y)
+    window.title(s)
 
 window.bind('<Button-1>', b1)
-#window.bind('<Button-3>', b3)
+window.bind('<Button-3>', b3)
 #window.bind('<Motion>', move)
 
-tab_control.pack(expand=1, fill='both') 
+
+
 window.mainloop()

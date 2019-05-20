@@ -2,44 +2,45 @@ import sys
 sys.path.append(sys.path[0]+'/Utils')
 from Utils.imports import *
 
-cs = Controller('localhost', 'admin', 'admin')
-topo = Topology()
-topo.requestData(cs)
-FM = flowManager
+def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
+    host = None
+    for node in topo.nodes.values():
+        if type(node) == Leaf and node.nAddresses[0][1] == ip:
+            host = node
 
-ip = input("IP>  ") # 10.0.0.1
-vlanFrom = input("VLAN FROM> ") # 100
-vlanTo = input("VLAN TO> ") # 101
+    if not host:
+        exit("WRONG IP: %s" % ip)
 
-host = None
-for node in topo.nodes.values():
-    if type(node) == Leaf and node.nAddresses[0][1] == ip:
-        host = node
+    switch = host.nConnections[0][0]
 
-if not host:
-    exit("WRONG IP: %s" % ip)
+    mac, ip = host.nAddresses[0]
+    print("Host:\r\n\tIP: %s\r\n\tMAC: %s" % (ip, mac))
+    print("Switch:\r\n\tName: %s" % switch.nId)
 
-switch = host.nConnections[0][0]
+    FM = flowManager()
+    FM.requestData(cs)
 
-mac, ip = host.nAddresses[0]
-print("Host:\r\n\tIP: %s\r\n\tMAC: %s" % (ip, mac))
-print("Switch:\r\n\tName: %s" % switch.nId)
+    for flow in FM.getSwitchTableFlowList(switch.nId, 0):
+        if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'src', mac):
+            sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
+            sflow.addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
+                 .addAction(SimpleFlow.createActionSetVLAN(vlanTo))
+            print(sflow.push(cs))
+    for flow in FM.getSwitchTableFlowList(switch.nId, 0):
+        if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'dst', mac):
+            sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
+            sflow.addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
+                 .addAction(SimpleFlow.createActionSetVLAN(vlanFrom))
+            print(sflow.push(cs))
 
-FM = flowManager()
-FM.requestData(cs)
-
-for flow in FM.getSwitchTableFlowList(switch.nId, 0):
-    if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'src', mac):
-        sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
-        sflow.addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
-             .addAction(SimpleFlow.createActionSetVLAN(vlanTo))
-        print(sflow.push(cs))
-for flow in FM.getSwitchTableFlowList(switch.nId, 0):
-    if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'dst', mac):
-        sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
-        sflow.addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
-             .addAction(SimpleFlow.createActionSetVLAN(vlanFrom))
-        print(sflow.push(cs))
+if __name__ == '__main__':
+    cs = Controller('localhost', 'admin', 'admin')
+    topo = Topology()
+    topo.requestData(cs)
+    ip = input("IP>  ") # 10.0.0.1
+    vlanFrom = input("VLAN FROM> ") # 100
+    vlanTo = input("VLAN TO> ") # 101
+    changeVLAN(cs, topo, ip, vlanFrom, vlanTo)
 
 #vlanFlow = SimpleFlow()
 #vlanFlow = vlanFlow.withId("VLAN-BAN-%s" % host.nAddresses[0][0]) \
