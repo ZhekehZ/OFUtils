@@ -18,18 +18,22 @@ def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
     FM = flowManager()
     FM.requestData(cs)
 
+    count, succ = 0, 0
     for flow in FM.getSwitchTableFlowList(switch.nId, 0):
         if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'src', mac):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanTo))
-            #print(sflow.push(cs))
+            succ += sflow.push(cs)
+            count+=1
     for flow in FM.getSwitchTableFlowList(switch.nId, 0):
         if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'dst', mac):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanFrom))
-            #print(sflow.push(cs))
+            succ += sflow.push(cs)
+            count+=1
+    print("RESULT: %d/%d"%(succ, count))
 
 if __name__ == '__main__':
     cs = Controller('localhost', 'admin', 'admin')

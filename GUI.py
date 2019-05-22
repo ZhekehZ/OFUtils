@@ -5,6 +5,8 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure, Text
 from matplotlib.pyplot import Circle
 
+import json
+
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -18,15 +20,29 @@ from Utils import *
 
 
 class App:
+    @staticmethod
+    def __nodeNameOptimizer(name):
+        m = re.fullmatch(r"openflow:(\d+)", name)
+        if m:
+            res = 'of:*' + m.group(1)[-3:]
+            return res
+        m = re.fullmatch(("host:"+"([a-fA-F0-9]{2}):"*6)[:-1], name)    
+        if m:
+            res = 'h:\n*' + m.group(5) + ':' + m.group(6)
+            return res
+        return name
+
     def __init__(self):
         self.__used = set()
         self.G = nx.Graph()  
         self.topo = Topology()
         self.selected = None
+        self.labels = dict()
         
     def __fillGraph(self, node, port):
         self.__used.add(node.nId)
         self.G.add_node(node.nId, connections=[])
+        self.labels[node.nId] = App.__nodeNameOptimizer(node.nId)
         for (next, port) in node.nConnections:
             self.G.nodes[node.nId]['connections'].append([port, next.nId])
             self.G.add_edge(node.nId, next.nId)
@@ -46,7 +62,7 @@ class App:
         #self.ax.set_title('Network graph')
         
         self.ax.set_axis_off()
-        self.pos = nx.spectral_layout(self.G, scale=0.1)
+        self.pos = nx.spring_layout(self.G, scale=0.1)
         self.cs = cs
         
     def draw(self):
@@ -55,7 +71,7 @@ class App:
         colors = ['b' if n in self.switches else 'r' for n in self.G]
         nx.draw_networkx_nodes(self.G, self.pos, node_color=colors, node_size=500, alpha=0.5, ax=self.ax)
         nx.draw_networkx_edges(self.G, self.pos, width=1, alpha=0.5, edge_color='k', ax=self.ax)
-        nx.draw_networkx_labels(self.G, self.pos, font_size=11, ax=self.ax)
+        nx.draw_networkx_labels(self.G, self.pos, labels=self.labels, font_size=11, ax=self.ax)
         if self.selected:    
             x, y = self.pos[self.selected]
             stype = self.selected in self.switches
@@ -70,7 +86,7 @@ FONT= ("Verdana", 12)
 
 window = Tk()
 window.title("UI")
-window.geometry('1200x600')  
+window.geometry('1050x600')  
 
 cs = Controller('localhost', 'admin', 'admin')
 vis = App()   
@@ -84,22 +100,38 @@ tab_control.add(tab1, text='График')
 
 canvas = FigureCanvasTkAgg(vis.fig, tab1)
 canvas.draw()
-canvas.get_tk_widget().pack(side=BOTTOM, fill=BOTH, expand=True)
+canvas.get_tk_widget().config(cursor='hand2')
+canvas.get_tk_widget().pack(side=LEFT, fill=BOTH, expand=True)
 #toolbar = NavigationToolbar2Tk(canvas, tab1)
 #toolbar.update()
-canvas._tkcanvas.pack(side=LEFT, fill=BOTH, expand=True)
+#canvas._tkcanvas.pack(side=LEFT, fill=BOTH, expand=True)
 
-lblt = Label(tab1,  width=50, height=15, text="", justify=LEFT, font=FONT)
-lblt.pack(side=TOP, fill=X, expand=True)
-lblt2 = Label(tab1,  width=50, height=20, text="-"*250)
-lblt2.pack(side=TOP, fill=X, expand=True)
+infoFrame = LabelFrame(tab1, text="Информация")
+infoFrame.pack(side=TOP, fill=BOTH, expand=1)
+tab1infoLabel = Label(infoFrame, anchor='nw', padx=30, pady=30, width=50, text="Выберите вершину", justify=LEFT, font=FONT)
+tab1infoLabel.pack(side=LEFT, fill=Y, expand=1)
+#lblt2 = Label(tab1,  width=50, height=20, text="-"*250)
+#lblt2.pack(side=TOP, fill=X, expand=True)
 """
     TAB 2
 """
 tab2 = ttk.Frame(tab_control)  
-tab_control.add(tab2, text='Информация')  
-lbl2 = Label(tab2, text='Информация какая-то')
-lbl2.pack(pady=10,padx=10)
+tab_control.add(tab2, text='Потоки')  
+
+
+flowList, currFlow = dict(), None
+scrollbar = Scrollbar(tab2)
+scrollbarText = Scrollbar(tab2)
+listbox = Listbox(tab2, bd=0, yscrollcommand=scrollbar.set)
+listbox.pack(side=LEFT, fill=Y)
+scrollbar.pack(side=LEFT, fill=Y)
+for i in range(100):
+    listbox.insert(END, i)
+scrollbar.config(command=listbox.yview)
+textarea = Text(tab2, wrap=NONE, yscrollcommand=scrollbarText.set)
+textarea.pack(side=LEFT, expand=1,fill=BOTH)
+scrollbarText.pack(side=LEFT, fill=Y)
+scrollbarText.config(command=textarea.yview)
 
 tab_control.pack(expand=1, fill='both') 
 
@@ -109,13 +141,43 @@ def update():
 
 update()
 
-def infoToStr(info):
-    res = ""
+
+def loadFlowList(cs, switch):
+    FM = flowManager() 
+    FM.requestData(cs)
+    textarea.delete('1.0',END)
+    listbox.delete(0, END)
+    currFlow = None
+    flows = FM.getSwitchTableFlowList(switch, 0)
+    for flow in flows: 
+        flowList[flow['flow']["id"]] = flow['flow']
+        listbox.insert(END, flow['flow']["id"])
+    
+def selectItem():
+    cs = listbox.curselection()
+    if len(cs) == 0:
+        return
+    currFlow = listbox.get(cs[0])
+    textarea.delete('1.0',END)
+    new_text = json.dumps({"flow":flowList[currFlow]}, indent=4, ensure_ascii=False)
+    textarea.insert('1.0',"".join(new_text))
+    
+listbox.bind("<<ListboxSelect>>", lambda x: selectItem())    
+
+def infoToStr(info, node, topo):
+    res = 'Имя: ' + node.upper() + '\n\n' 
+    node = topo.nodes[node]
+    res += 'Тип: ' + ( 'Хост' if type(node) == Leaf else 'Коммутатор') + '\n\n'   
+    if (type(node) == Leaf):
+        res += 'MAC-адрес: ' + node.nAddresses[0][0] + '\n'
+        res += 'IP-адрес: ' + node.nAddresses[0][1] + '\n'
+        res += '\n'
+        res += 'Подключен к ' + info[0][1].upper()
+        return res   
+    
+    res += 'Подключен к:\n'
     for i in info:
-        if (i[0] == -1):
-            res += "➜  " + str(i[1]) + "\n"
-        else:
-            res += "port " + str(i[0]) + ":\n➜  " + str(i[1]) + "\n"
+        res += "    [порт %s]"%str(i[0]) + "  ➜  " + str(i[1]).upper() + "\n"
     return res
        
 def checkMouse(ex, ey):
@@ -126,9 +188,6 @@ def checkMouse(ex, ey):
     width, height = box.width, box.height
     width *= vis.fig.dpi
     height *= vis.fig.dpi
-    
-    if ex > width:
-        return
     
     nearest_node = None
     for n in vis.pos.keys():
@@ -183,8 +242,10 @@ pop = Popup()
 def b1(event):
     nn = checkMouse(event.x, event.y)
     vis.selected = nn
-    content = str(nn).upper() + "\n\n"+ infoToStr(vis.G.nodes[nn]['connections']) if not nn is None else ''
-    lblt['text'] = content   
+    content = infoToStr(vis.G.nodes[nn]['connections'], nn, vis.topo) if not nn is None else ''
+    if nn and type(vis.topo.nodes[nn]) == Node:
+        loadFlowList(cs, nn)
+    tab1infoLabel['text'] = content   
     update()    
             
 def b3(event):
@@ -201,8 +262,9 @@ def move(event):
     s = "Движение мышью {}x{}".format(x, y)
     window.title(s)
 
-window.bind('<Button-1>', b1)
-window.bind('<Button-3>', b3)
+canvas.get_tk_widget().bind('<Button-1>', b1)
+#window.bind('<Button-1>', b1)
+canvas.get_tk_widget().bind('<Button-3>', b3)
 #window.bind('<Motion>', move)
 
 
