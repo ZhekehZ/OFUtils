@@ -91,6 +91,11 @@ class SimpleFlow:
     def createMatchVLAN(vlanId):
         res = {"vlan-match": { "vlan-id": { "vlan-id": vlanId, "vlan-id-present": "true"}}}
         return res
+
+    @staticmethod
+    def createActionDrop():
+        res = { "drop-action": {} }
+        return res                        
         
     @staticmethod
     def createMatchMacSrc(src):
