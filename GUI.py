@@ -6,6 +6,7 @@ from matplotlib.figure import Figure, Text
 from matplotlib.pyplot import Circle
 
 import json
+import time
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -77,8 +78,6 @@ class App:
             stype = self.selected in self.switches
             circle = Circle((x, y), 0.01, lw=2, fill=False, ec="red" if stype else 'blue', linestyle='--')
             self.ax.add_artist(circle)
- 
- 
 
 
 
@@ -119,21 +118,39 @@ tab2 = ttk.Frame(tab_control)
 tab_control.add(tab2, text='Потоки')  
 
 
-flowList, currFlow = dict(), None
+flowList, currFlow, currSwitch = dict(), None, None
 scrollbar = Scrollbar(tab2)
 scrollbarText = Scrollbar(tab2)
-listbox = Listbox(tab2, bd=0, yscrollcommand=scrollbar.set)
+listbox = Listbox(tab2, width=50, bd=0, yscrollcommand=scrollbar.set)
 listbox.pack(side=LEFT, fill=Y)
 scrollbar.pack(side=LEFT, fill=Y)
-for i in range(100):
-    listbox.insert(END, i)
+#for i in range(100):
+#    listbox.insert(END, i)
 scrollbar.config(command=listbox.yview)
-textarea = Text(tab2, wrap=NONE, yscrollcommand=scrollbarText.set)
-textarea.pack(side=LEFT, expand=1,fill=BOTH)
+textarea = Text(tab2, wrap=NONE, yscrollcommand=scrollbarText.set, height=70)
+def sendflowProc():
+    rawflow = json.loads(textarea.get(1.0, END))["flow"]
+    sflow = SimpleFlow.fromRAWFlow(currSwitch, rawflow)
+    print(sflow.push(cs))
+    time.sleep(1)
+    loadFlowList(cs, currSwitch)
+
+groupBtns = LabelFrame(tab2)
+
+sendFlowBtn = Button(groupBtns, text="Отправить", command=sendflowProc, font=FONT)
+updateFlowBtn = Button(groupBtns, text="Обновить", command=lambda: loadFlowList(cs, currSwitch), font=FONT)
+
+groupBtns.pack(side=BOTTOM, fill=X, expand=1, anchor=S)
+textarea.pack(side=LEFT, expand=1, fill=BOTH)
+updateFlowBtn.pack(side=LEFT,anchor=SW)
+sendFlowBtn.pack(side=RIGHT, anchor=SE)
+
 scrollbarText.pack(side=LEFT, fill=Y)
 scrollbarText.config(command=textarea.yview)
 
+
 tab_control.pack(expand=1, fill='both') 
+
 
 def update():
     vis.draw()
@@ -143,11 +160,14 @@ update()
 
 
 def loadFlowList(cs, switch):
+    global currSwitch
+    global currFlow
     FM = flowManager() 
     FM.requestData(cs)
     textarea.delete('1.0',END)
     listbox.delete(0, END)
     currFlow = None
+    currSwitch = switch
     flows = FM.getSwitchTableFlowList(switch, 0)
     for flow in flows: 
         flowList[flow['flow']["id"]] = flow['flow']
@@ -227,15 +247,59 @@ def changeVlan(ip):
     enew.grid(row=1, column=1)
     Button(a, text="submit", width=20, command=lambda:change(eold.get(), enew.get(), a)).grid(row=2, column=0, columnspan=2)
 
+
+def makePath(mac1, mac2, ip1, ip2):
+    def make(mac1, mac2):
+        pushFlow(cs, vis.topo, mac1, mac2)
+        pushFlow(cs, vis.topo, mac2, mac1)
+        amp.destroy()
+    amp = Toplevel()
+    amp.title("make path")
+    x, y = window.winfo_x(), window.winfo_y()
+    w, h = window.winfo_width(), window.winfo_height()   
+    amp.geometry("%dx%d+%d+%d" % (230, 100, x + w // 2, y + h // 2))
+    amp.resizable(False, False)  
+    lbel = Label(amp, text="path %s <---> %s" % (ip1, ip2), justify=CENTER, font=FONT)
+    lbel.grid(row=0)
+    lold = Label(amp, text="MAC_1: %s"%mac1, justify=CENTER, font=FONT)
+    lold.grid(row=3)
+    lnew = Label(amp, text="MAC_2: %s"%mac2, justify=CENTER, font=FONT)
+    lnew.grid(row=4)
+    Button(amp, text="submit", width=20, command=lambda:make(mac1, mac2)).grid(row=5)
+
+
+class flowCreator():
+    def __init__(self):
+        self.aip = None
+        self.bip = None
+        self.amac = None
+        self.bmac = None
+    def call_fm(self):
+        if self.aip and self.bip:
+            makePath(self.amac, self.bmac, self.aip, self.bip)
+    def path_from(self, aip, amac):
+        self.aip = aip
+        self.amac = amac
+        self.call_fm()
+    def path_to(self, bip, bmac):
+        self.bip = bip
+        self.bmac = bmac
+        self.call_fm()
+fc = flowCreator()        
+
 class Popup:
     def __init__(self):
         self.menu = Menu(window.master)
         self.ip = None
+        self.mac = None
         self.menu.add_command(label="Изменить VLAN", command=lambda:changeVlan(self.ip))
+        self.menu.add_command(label="Путь отсюда", command=lambda:fc.path_from(self.ip, self.mac))
+        self.menu.add_command(label="Путь сюда", command=lambda:fc.path_to(self.ip, self.mac))
         #self.menu.add_separator()
 
-    def show_menu_(self, event, nip):
+    def show_menu_(self, event, nip, mac):
         self.ip = nip
+        self.mac = mac
         self.menu.tk_popup(event.x_root, event.y_root)
 pop = Popup()          
         
@@ -252,7 +316,7 @@ def b3(event):
     nn = checkMouse(event.x, event.y)
     vis.selected = nn
     if nn in vis.hosts:
-        pop.show_menu_(event, vis.topo.nodes[nn].nAddresses[0][1])
+        pop.show_menu_(event, vis.topo.nodes[nn].nAddresses[0][1], vis.topo.nodes[nn].nAddresses[0][0])
     update()
 
 def move(event):

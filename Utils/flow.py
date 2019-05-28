@@ -70,8 +70,19 @@ class SimpleFlow:
     def push(self, cs):
         url = "opendaylight-inventory:nodes/node/%s/table/%d/flow/%s" % (self.fSwitch, self.fTbl, self.fId)
         return cs.put(url, self.toJson())    
-        
-        
+            
+    @staticmethod
+    def isMatchVLAN(match):
+        if "vlan-match" in match:
+            return True
+        return False
+    
+    @staticmethod
+    def isActionSetVLAN(action):
+        if "set-field" in action:
+            if "vlan-match" in action["set-field"]:
+                return True 
+        return False    
         
     @staticmethod
     def createMatchL2(src, dst):
@@ -99,6 +110,21 @@ class SimpleFlow:
                     "ethernet-source": { "address": src }
               } }
         return res
+        
+    @staticmethod
+    def createMatchEthernetType(tpe):
+        res = { "ethernet-match": { "ethernet-type": { "type": str(tpe) } } }
+        return res
+        
+    @staticmethod
+    def createMatchArpTargetTransportAddress(addr):
+        res = { "arp-target-transport-address": addr + "/32"}
+        return res  
+           
+    @staticmethod
+    def createMatchArpSourceTransportAddress(addr):
+        res = { "arp-source-transport-address": addr + "/32"}
+        return res  
         
     @staticmethod
     def createActionOutputToPort(port, maxLength=65535):

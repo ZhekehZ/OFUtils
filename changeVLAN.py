@@ -19,9 +19,33 @@ def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
     FM.requestData(cs)
 
     count, succ = 0, 0
+    
+    arpflowin = SimpleFlow().withId(str(switch.nId) + "_" + ip + "_arp_vlan_in") \
+                          .withPri(1000) \
+                          .withTbl(0) \
+                          .withSwitch(switch.nId) \
+                          .addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
+                          .addMatch(SimpleFlow.createMatchEthernetType(2054)) \
+                          .addMatch(SimpleFlow.createMatchArpTargetTransportAddress(ip)) \
+                          .addAction(SimpleFlow.createActionNormal()) \
+                          .addAction(SimpleFlow.createActionSetVLAN(vlanFrom)) 
+    arpflowout = SimpleFlow().withId(str(switch.nId) + "_" + ip + "_arp_vlan_out") \
+                          .withPri(1000) \
+                          .withTbl(0) \
+                          .withSwitch(switch.nId) \
+                          .addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
+                          .addMatch(SimpleFlow.createMatchEthernetType(2054)) \
+                          .addMatch(SimpleFlow.createMatchArpSourceTransportAddress(ip)) \
+                          .addAction(SimpleFlow.createActionNormal()) \
+                          .addAction(SimpleFlow.createActionSetVLAN(vlanTo)) 
+    print(arpflowin.push(cs)) 
+    print(arpflowout.push(cs))                     
+    
     for flow in FM.getSwitchTableFlowList(switch.nId, 0):
         if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'src', mac):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
+            sflow.fActions = list(filter(lambda x: not SimpleFlow.isActionSetVLAN(x), sflow.fActions))
+            sflow.fMatches = list(filter(lambda x: not SimpleFlow.isMatchVLAN(x),     sflow.fMatches))
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanFrom)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanTo))
             succ += sflow.push(cs)
@@ -29,6 +53,8 @@ def changeVLAN(cs, topo, ip, vlanFrom, vlanTo):
     for flow in FM.getSwitchTableFlowList(switch.nId, 0):
         if FM.flowSrcDstMacIs(switch.nId, 0, flow['flow']['id'], 'dst', mac):
             sflow = SimpleFlow.fromRAWFlow(switch.nId, flow['flow'])
+            sflow.fActions = list(filter(lambda x: not SimpleFlow.isActionSetVLAN(x), sflow.fActions))
+            sflow.fMatches = list(filter(lambda x: not SimpleFlow.isMatchVLAN(x),     sflow.fMatches))
             sflow.addMatch(SimpleFlow.createMatchVLAN(vlanTo)) \
                  .addAction(SimpleFlow.createActionSetVLAN(vlanFrom))
             succ += sflow.push(cs)
