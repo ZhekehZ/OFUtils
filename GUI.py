@@ -7,6 +7,7 @@ from matplotlib.pyplot import Circle
 
 import json
 import time
+import os.path
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -19,6 +20,13 @@ import numpy as np
 from changeVLAN import changeVLAN
 from Utils import *
 
+VLANS = {}
+def saveData():
+    global VLANS
+    with open('vlans.json', 'w') as outfile:
+        json.dump(VLANS, outfile)
+if os.path.exists("vlans.json"):
+    VLANS = dict(json.load(open("vlans.json")))
 
 class App:
     @staticmethod
@@ -193,6 +201,13 @@ def infoToStr(info, node, topo):
         res += 'IP-адрес: ' + node.nAddresses[0][1] + '\n'
         res += '\n'
         res += 'Подключен к ' + info[0][1].upper()
+        mac = node.nAddresses[0][0] 
+        if info[0][1]:
+            if info[0][1] in VLANS.keys():
+                vs = VLANS[info[0][1]]
+                if mac in vs:
+                    res += "\n\n\nVLAN:\n    На устройстве:\t%s"%vs[mac]["vlan_real"] + \
+                                      "\n    В сети:\t\t%s"%vs[mac]["vlan_fake"]
         return res   
     
     res += 'Подключен к:\n'
@@ -227,8 +242,10 @@ def checkMouse(ex, ey):
 
 def changeVlan(ip):
     def change(vf, vt, win):
+        global VLANS
         #print(vf, vt, ip)
-        changeVLAN(cs, vis.topo, ip, vf, vt)
+        VLANS = changeVLAN(cs, vis.topo, ip, vf, vt, VLANS)
+        saveData()
         a.destroy()
     a = Toplevel()
     a.title("chVLAN %s"%ip)

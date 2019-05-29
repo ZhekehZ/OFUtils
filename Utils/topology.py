@@ -39,6 +39,13 @@ class Topology:
                 res = [i for i in res if i[mt.group(2)] == mt.group(3)][0]
                 ref = mt.group(4)  
         return res
+        
+    def macToIp(self, mac):
+        for n in self.nodes.values():
+            if type(n) == Leaf:
+                if n.nAddresses[0][0] == mac:
+                    return n.nAddresses[0][1]
+        return "0.0.0.0"     
 
     def requestData(self, cs):
         self.topoJson = cs.request("network-topology:network-topology/")

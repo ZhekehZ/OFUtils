@@ -52,6 +52,18 @@ class flowManager:
             return False
         else:
             return str(flow['match']['ethernet-match'][kind]['address']) == addr
+   
+    def getSrcDstMac(self, switch, table, flowId, kind):
+        kind = 'ethernet-source' if kind == 'src' else 'ethernet-destination'
+        if not self.flowIsIPv4(switch, table, flowId):
+            return -1
+        flows = self.raw_flow_tables[switch][table]
+        flow = [f['flow'] for f in flows if f['flow']['id'] == flowId][0]
+        ethMatch = flow['match']['ethernet-match']
+        if not kind in flow['match']['ethernet-match'].keys():
+            return -1
+        else:
+            return str(flow['match']['ethernet-match'][kind]['address'])   
         
     def requestData(self, cs):
         dataJson = cs.request("opendaylight-inventory:nodes", True)['nodes']['node'] #operational datastore
@@ -94,7 +106,7 @@ class flowManager:
         else:
             match = json2xml.Json2xml(flowData['flow']['match'], wrapper="match").to_xml()
             cs.deleteOperational(switch, table, flowData['flow']['priority'], match)
-
+        
 
 #test
 if __name__ == "__main__":
