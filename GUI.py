@@ -20,6 +20,8 @@ import numpy as np
 from changeVLAN import changeVLAN
 from Utils import *
 
+du = DU()
+
 VLANS = {}
 def saveData():
     global VLANS
@@ -59,6 +61,7 @@ class App:
                 self.__fillGraph(next, str(port))
 
     def requestData(self, cs):
+        self.topo = Topology()
         self.topo.requestData(cs)
         self.hosts = [h.nId for h in self.topo.nodes.values() if type(h) == Leaf]
         self.switches = [s.nId for s in self.topo.nodes.values() if type(s) == Node]
@@ -71,8 +74,17 @@ class App:
         #self.ax.set_title('Network graph')
         
         self.ax.set_axis_off()
-        self.pos = nx.spring_layout(self.G, scale=0.1)
+        self.pos = nx.spring_layout(self.G, scale=0.1, seed=239, iterations=200, k=1)
         self.cs = cs
+        
+    def updateData(self, cs):   
+        self.topo = Topology()
+        self.topo.requestData(cs)
+        self.hosts = [h.nId for h in self.topo.nodes.values() if type(h) == Leaf]
+        self.switches = [s.nId for s in self.topo.nodes.values() if type(s) == Node]
+        self.__used = set()
+        self.__fillGraph(self.topo.nodes[self.switches[0]], '')
+        self.pos = nx.spring_layout(self.G, scale=0.1, seed=239, iterations=200, k=1)
         
     def draw(self):
         self.ax.cla()
@@ -96,8 +108,9 @@ window.title("UI")
 window.geometry('1050x600')  
 
 cs = Controller('localhost', 'admin', 'admin')
-vis = App()   
-vis.requestData(cs) 
+vis = App()  
+vis.requestData(cs)
+du.start(cs)
 tab_control = ttk.Notebook(window)  
 """
     TAB 1
@@ -163,8 +176,8 @@ tab_control.pack(expand=1, fill='both')
 def update():
     vis.draw()
     canvas.draw()
-
 update()
+
 
 
 def loadFlowList(cs, switch):
@@ -349,5 +362,10 @@ canvas.get_tk_widget().bind('<Button-3>', b3)
 #window.bind('<Motion>', move)
 
 
-
+def visupdater():
+    if du.getTopoChanged():
+        vis.updateData(cs)
+        update()
+    window.after(1000, visupdater)
+window.after(1, visupdater)
 window.mainloop()

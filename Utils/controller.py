@@ -45,6 +45,26 @@ class Controller():
             printe( "ERROR LOADING DATA" )
             return False
             
+    def subscribeEvent(self, event, data):
+        url = "http://%s:8181/restconf/operations/%s" % (self.ip, event)
+        try:
+            headers = {'Content-Type': 'application/xml'}
+            result = requests.post(url, auth=(self.user, self.password), data=data, headers=headers)
+            return result.json()
+        except:
+            printe( "ERROR CREATING EVENT SUBSCRIBER" )
+            return False       
+            
+    def getStream(self, streamName):
+        url = "http://localhost:8181/restconf/streams/stream/%s"%streamName
+        try:
+            result = requests.get(url, auth=(self.user, self.password))
+            return result.json()
+        except:
+            printe( "ERROR LOADING DATA" )
+            return None
+        
+            
     def deleteConfig(self, loc):
         url = "http://%s:8181/restconf/config/%s" % (self.ip, loc) 
            

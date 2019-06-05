@@ -48,6 +48,7 @@ class Topology:
         return "0.0.0.0"     
 
     def requestData(self, cs):
+        self.nodes = dict()
         self.topoJson = cs.request("network-topology:network-topology/")
         self.invJson = cs.request("opendaylight-inventory:nodes/")
         self.dataReady = True
