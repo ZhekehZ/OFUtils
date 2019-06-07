@@ -58,6 +58,7 @@ class MainWindow(Tk):
             self.tab1.updateInfo(self.tab1Log.getConnections(nn), nn, self.tab1Log.topo)
             if nn and type(self.tab1Log.topo.nodes[nn]) == Utils.Node:
                 self.tab2.setSwitch(nn)
+                self.tab3.setSwitch(nn)
                 
         def onCallMenu(event):
             nn = buttonClick(event)
@@ -77,7 +78,7 @@ class MainWindow(Tk):
             
         if force or self.du.getInvChanged():
             self.tab2.update()
-            self.tab2.setSwitch(self.tab2.currSwitch)
+            self.tab3.update()
         
     def run(self):
         def autoupdater():

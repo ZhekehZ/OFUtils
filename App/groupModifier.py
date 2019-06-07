@@ -42,67 +42,111 @@ class textField(Frame):
 class GroupModFrame(Frame):
    
     def __selectItem(self):
-        crs = self.flowL.listbox.curselection()
+        crs = self.groupL.listbox.curselection()
         if len(crs) == 0:
             return
-        self.currFlow = self.flowL.listbox.get(crs[0])
+        self.currGroup = self.groupL.listbox.get(crs[0])
         self.textF.textarea.delete('1.0',END)
-        new_text = json.dumps({"flow":self.currSFlowList[self.currFlow]}, indent=4, ensure_ascii=False)
+        new_text = json.dumps({"group":self.currSGroupList[self.currGroup]}, indent=4, ensure_ascii=False)
         self.textF.textarea.insert('1.0',"".join(new_text))
     
     def __init__(self, parent, cs, fm):
         Frame.__init__(self, parent, bg='white')
         parent.add(self, text='Groups')
         
-        self.currFlow = None
+        self.currGroup = None
         self.currSwitch = None
         self.FM = fm
         self.cs = cs
         
-        self.currSFlowList = dict()
-        self.currSFlowStats = dict()
+        self.currSGroupList = dict()
+        self.currSGroupStats = dict()
         
         self.union = Frame(self)
         self.controls = controlFrame(self.union)
         self.controls.pack(side=BOTTOM, fill=X)
-        self.flowL = flowList(self.union)
-        self.flowL.pack(side=TOP, expand=1, fill=BOTH)
+        self.groupL = flowList(self.union)
+        self.groupL.pack(side=TOP, expand=1, fill=BOTH)
         self.union.pack(side=LEFT, expand=1, fill=BOTH)
         
         self.textF = textField(self)
         self.textF.pack(side=LEFT, expand=1, fill=BOTH)
         
-        self.flowL.listbox.bind("<<ListboxSelect>>", lambda event: self.__selectItem()) 
-        def sendflowProc():
-            rawflow = json.loads(self.textF.textarea.get(1.0, END))["flow"]
-            sflow = Utils.SimpleFlow.fromRAWFlow(self.currSwitch, rawflow)
-            #print(sflow.push(self.cs), self.currSwitch)
+        self.groupL.listbox.bind("<<ListboxSelect>>", lambda event: self.__selectItem()) 
+        
+        def sendGroupProc():
+            rawgroup = json.loads(self.textF.textarea.get(1.0, END))["group"]
+            sgroup = Utils.SimpleGroup.fromRAWGroup(self.currSwitch, rawgroup)
+            print(sgroup.push(self.cs), self.currSwitch)
             #time.sleep(1)
             self.update()
-            self.setSwitch(self.currSwitch)
-        def clear_textfield():
+        
+        def addGroupProc():
+            dumm = """{
+    "flow-node-inventory:group": [
+        {
+            "group-id": <?>,
+            "group-type": <?>,
+            "buckets": {
+                "bucket": [
+                    <?>
+                ]
+            }
+        }
+    ]
+}"""
             self.textF.textarea.delete('1.0',END)
+            self.textF.textarea.insert('1.0',"".join(dumm))
+        
         def showStats():
-            print(self.currSFlowStats[self.currFlow])
-        self.controls.addFlowBtn.bind('<Button-1>', lambda event: clear_textfield())
-        self.controls.sendFlowBtn.bind('<Button-1>', lambda event: sendflowProc())
+            if not self.currGroup:
+                return
+            stats = self.currSGroupStats[self.currGroup]
+            
+            statstext = 'Bytes: '
+            if stats and 'byte-count' in stats.keys():
+                statstext += str(stats['byte-count']) + '\n'
+            else:
+                statstext += '0\n'
+            statstext += 'Packets: '
+            if stats and 'packet-count' in stats.keys():
+                statstext += str(stats['packet-count']) + '\n'
+            else:
+                statstext += '0\n'
+            messagebox.showinfo("Flow stats", statstext)
+        
+        def deleteGroupProc():
+            print("REMOVING GROUP")
+            self.FM.removeGroup(self.cs, self.currSwitch, self.currGroup)
+            self.update()
+            
+        self.controls.addFlowBtn.bind('<Button-1>', lambda event: addGroupProc())
+        self.controls.sendFlowBtn.bind('<Button-1>', lambda event: sendGroupProc())
         self.controls.statFlowBtn.bind('<Button-1>', lambda event: showStats())
-    
+        self.controls.deleteFlowBtn.bind('<Button-1>', lambda event: deleteGroupProc())
+        
     def update(self):
         self.FM.requestData(self.cs)
+        if self.currSwitch:
+            self.setSwitch(self.currSwitch)
         
     def setSwitch(self, switch):
-        pass
-        #self.flowL.listbox.delete(0, END)
-        #self.currSwitch = switch
-        #for table
-        #self.currSFlowList = dict() 
-        #flows = self.FM.getSwitchTableFlowList(switch, 0)
-        #for flow in flows: 
-        #    self.currSFlowStats[flow['flow']["id"]] = flow['flow']['opendaylight-flow-statistics:flow-statistics']
-        #    flow['flow'].pop('opendaylight-flow-statistics:flow-statistics', None)
-        #    self.currSFlowList[flow['flow']["id"]] = flow['flow']
-        #    self.flowL.listbox.insert(END, flow['flow']["id"])
+        self.groupL.listbox.delete(0, END)
+        self.currSwitch = switch
+        self.currSGroupList = dict() 
+        groups = self.FM.getSwitchGroupList(switch)
+        for group in groups:
+            group = group[0]     
+            _gr = 'flow-node-inventory:group'
+            _st = 'opendaylight-group-statistics:group-statistics'
+            if _st in group[_gr].keys():
+                self.currSGroupStats[group[_gr]["group-id"]] = group[_gr][_st]
+            else:
+                self.currSGroupStats[group[_gr]["group-id"]] = None
+            group[_gr].pop(_st, None)
+            
+            self.currSGroupList[group['flow-node-inventory:group']["group-id"]] = group['flow-node-inventory:group']
+            self.groupL.listbox.insert(END, group['flow-node-inventory:group']["group-id"])
         
         
         

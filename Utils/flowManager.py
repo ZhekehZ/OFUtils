@@ -4,6 +4,7 @@ from json2xml import json2xml
 class flowManager:
     def __init__(self):
         self.raw_flow_tables = dict()
+        self.raw_group_tables = dict()
         
     @staticmethod
     def __findById(jsData, switch, table, flowId):
@@ -79,6 +80,15 @@ class flowManager:
                            'isConfig':flowManager.__findById(configJson, switchData['id'], table['id'], f['id'])} \
                         for f in table['flow']]
             self.raw_flow_tables[switchData['id']] = parsed_tables
+            
+            parsed_groups = {}
+            if 'flow-node-inventory:group' in switchData.keys():
+                groups = switchData['flow-node-inventory:group']
+                for group in groups:
+                    parsed_groups[group['group-id']] = \
+                        [ {'flow-node-inventory:group':group}]
+            self.raw_group_tables[switchData['id']] = parsed_groups 
+        
         
     def getSwitchList(self):
         if not self.raw_flow_tables:
@@ -96,6 +106,12 @@ class flowManager:
             return []
         return list(self.raw_flow_tables[switch][table])
         
+    def getSwitchGroupList(self, switch):
+        if not switch in self.getSwitchList():
+            return []
+        #print(*[(a, len(self.raw_group_tables[a])) for a in self.raw_group_tables.keys()])
+        return list(self.raw_group_tables[switch].values())
+        
     def removeFlow(self, cs, switch, table, flow):
         flowData = [f for f in self.getSwitchTableFlowList(switch, table) if f['flow']['id'] == flow]
         if len(flowData) == 0:
@@ -106,8 +122,18 @@ class flowManager:
         else:
             match = json2xml.Json2xml(flowData['flow']['match'], wrapper="match").to_xml()
             cs.deleteOperational(switch, table, flowData['flow']['priority'], match)
-        
-
+    
+    def removeGroup(self, cs, switch, group):
+        groupData = []
+        for g in self.getSwitchGroupList(switch):
+            g = g[0]
+            if g['flow-node-inventory:group']['group-id'] == group:
+                groupData.append(g)
+        if len(groupData) == 0:
+            return None
+        groupData = groupData[0]
+        cs.deleteConfig("opendaylight-inventory:nodes/node/%s/group/%s" % (str(switch), str(group)))
+    
 #test
 if __name__ == "__main__":
     cs = Controller('localhost', 'admin', 'admin')

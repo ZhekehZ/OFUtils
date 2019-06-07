@@ -9,9 +9,10 @@ class SimpleGroup:
     def __init__(self):
         self.gSwitch = None  
         self.gId = 0   
-        self.gName = "GROUP-0" 
+        self.gName = None
         self.gType = self.GType.ALL
         self.gBuckets = []
+        self.gOther = {}
         
     def withSwitch(self, s):
         self.gSwitch = s
@@ -43,7 +44,8 @@ class SimpleGroup:
         groupStr = "flow-node-inventory:group"
         res = {groupStr: [{}]}
         res[groupStr][0]["group-id"] = self.gId
-        res[groupStr][0]["group-name"] = self.gName
+        if self.gName:
+            res[groupStr][0]["group-name"] = self.gName
         res[groupStr][0]["group-type"] = self.gType.value
         res[groupStr][0]["barrier"] = False
         
@@ -61,7 +63,7 @@ class SimpleGroup:
                 _bucket["action"].append(_action)
             _buckets.append(_bucket)
         res[groupStr][0]["buckets"]["bucket"] = _buckets
-   
+        res[groupStr][0].update(self.gOther)
         return res
         
     def push(self, cs):
@@ -77,11 +79,33 @@ class SimpleGroup:
     def createActionOutputToPort(port, maxLength=65535):
        res = {"output-action": { "output-node-connector": port, "max-length": maxLength }}
        return res
-
-
-
-
-
-
+       
+    @staticmethod
+    def fromRAWGroup(switch, rGroup):
+        rawGroup = rGroup.copy()
+        sgroup = SimpleGroup()
+        sgroup.gSwitch = switch
+        sgroup.gId = rawGroup['group-id']      
+        sgroup.gType = [gt for gt in SimpleGroup.GType if gt.value==rawGroup['group-type']][0]
+        
+        _buckets = []
+        if 'buckets' in rGroup.keys():
+            for bucket in rGroup['buckets']['bucket']:
+                _bucket = []
+                bucket.pop('bucket-id', None)
+                if 'action' in bucket.keys():
+                    for action in bucket['action']:
+                        action.pop('order', None)
+                        _bucket.append(action)
+                _buckets.append(_bucket)
+        sgroup.gBuckets = _buckets
+        
+        others = rawGroup
+        others.pop("group-id", None)
+        others.pop("group-type", None)
+        others.pop("buckets", None)
+        
+        sgroup.gOther = others
+        return sgroup
 
        

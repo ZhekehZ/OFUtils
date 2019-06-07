@@ -73,23 +73,64 @@ class FlowModFrame(Frame):
         self.textF.pack(side=LEFT, expand=1, fill=BOTH)
         
         self.flowL.listbox.bind("<<ListboxSelect>>", lambda event: self.__selectItem()) 
+        
         def sendflowProc():
             rawflow = json.loads(self.textF.textarea.get(1.0, END))["flow"]
             sflow = Utils.SimpleFlow.fromRAWFlow(self.currSwitch, rawflow)
-            #print(sflow.push(self.cs), self.currSwitch)
+            print(sflow.push(self.cs), self.currSwitch)
             #time.sleep(1)
             self.update()
             self.setSwitch(self.currSwitch)
-        def clear_textfield():
+        
+        def addFlowProc():
+            dumm = """{
+    "flow": {
+        "match": {
+            <?>
+        },
+        "id": <?>,
+        "priority": <?>,
+        "instructions": {
+            "instruction": [
+                <?>
+            ]
+        },
+        "table_id": <?>
+    }
+}"""
             self.textF.textarea.delete('1.0',END)
+            self.textF.textarea.insert('1.0',"".join(dumm))
+        
         def showStats():
-            print(self.currSFlowStats[self.currFlow])
-        self.controls.addFlowBtn.bind('<Button-1>', lambda event: clear_textfield())
+            if not self.currFlow:
+                return
+            stats = self.currSFlowStats[self.currFlow]
+            statstext = 'Bytes: '
+            if stats and 'byte-count' in stats.keys():
+                statstext += str(stats['byte-count']) + '\n'
+            else:
+                statstext += '0\n'
+            statstext += 'Packets: '
+            if stats and 'packet-count' in stats.keys():
+                statstext += str(stats['packet-count']) + '\n'
+            else:
+                statstext += '0\n'
+            messagebox.showinfo("Flow stats", statstext)
+        
+        def deleteFlowProc():
+            print("REMOVING FLOW")
+            self.FM.removeFlow(self.cs, self.currSwitch, 0, self.currFlow)
+            self.update()
+        
+        self.controls.addFlowBtn.bind('<Button-1>', lambda event: addFlowProc())
         self.controls.sendFlowBtn.bind('<Button-1>', lambda event: sendflowProc())
         self.controls.statFlowBtn.bind('<Button-1>', lambda event: showStats())
+        self.controls.deleteFlowBtn.bind('<Button-1>', lambda event: deleteFlowProc())
     
     def update(self):
         self.FM.requestData(self.cs)
+        if self.currSwitch:
+            self.setSwitch(self.currSwitch)
         
     def setSwitch(self, switch):
         self.flowL.listbox.delete(0, END)
@@ -98,7 +139,8 @@ class FlowModFrame(Frame):
         self.currSFlowList = dict() 
         flows = self.FM.getSwitchTableFlowList(switch, 0)
         for flow in flows: 
-            self.currSFlowStats[flow['flow']["id"]] = flow['flow']['opendaylight-flow-statistics:flow-statistics']
+            if 'opendaylight-flow-statistics:flow-statistics' in flow['flow'].keys(): 
+                self.currSFlowStats[flow['flow']["id"]] = flow['flow']['opendaylight-flow-statistics:flow-statistics']
             flow['flow'].pop('opendaylight-flow-statistics:flow-statistics', None)
             self.currSFlowList[flow['flow']["id"]] = flow['flow']
             self.flowL.listbox.insert(END, flow['flow']["id"])
