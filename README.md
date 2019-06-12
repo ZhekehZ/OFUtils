@@ -28,5 +28,5 @@ An application for configuring OpenFlow tables Application for configuring OpenF
      #   OpenFlowApp="~/Загрузки/OpenDaylight-Openflow-App/"
      $ ./launch.sh
  ```
- ![Network topology](https://github.com/ZhekehZ/OFUtils/blob/master/ex.png)
- ![Flow editor](https://github.com/ZhekehZ/OFUtils/blob/master/ex2.png)
+ ![Network topology](https://github.com/ZhekehZ/OFUtils/blob/master/ex.jpg)
+ ![Flow editor](https://github.com/ZhekehZ/OFUtils/blob/master/ex2.jpg)
